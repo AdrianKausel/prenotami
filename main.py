@@ -7,8 +7,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver import ChromeOptions
 from selenium.webdriver.support.ui import Select
+from selenium.webdriver.chrome.options import Options
 from datetime import datetime
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from time import sleep
 import logging
 import yaml
@@ -17,14 +18,20 @@ import time
 import random
 import undetected_chromedriver as udc
 
-load_dotenv()
 
+load_dotenv()
 logging.basicConfig(
     format="%(levelname)s:%(message)s",
     level=logging.INFO,
-    handlers=[logging.FileHandler("/tmp/out.log"), logging.StreamHandler(sys.stdout)],
+    handlers=[logging.FileHandler("./out.log"), logging.StreamHandler(sys.stdout)],
 )
 
+## Unix Log file
+##logging.basicConfig(
+##    format="%(levelname)s:%(message)s",
+##    level=logging.INFO,
+##    handlers=[logging.FileHandler("/tmp/out.log"), logging.StreamHandler(sys.stdout)],
+#)
 
 class Prenota:
     @staticmethod
@@ -41,39 +48,31 @@ class Prenota:
     @staticmethod
     def check_for_dialog(driver):
         try:
-            dialog = WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@role='dialog']"))
-            )
-            button_inside_dialog = dialog.find_element(
-                By.XPATH, "//button[contains(text(),'ok')]"
-            )
-            button_inside_dialog.click()
-            logging.info(
-                f"Timestamp: {str(datetime.now())} - Scheduling is not available right now."
-            )
+            # Wait for the popup to fully appear
+            WebDriverWait(driver, 30).until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[2]/div[2]/div/div/div/div/div/div/div")))
+            # If the popup appears, click the 'OK' button
+            ok_button = WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'ok')]")))
+            driver.execute_script("arguments[0].click();", ok_button)
+            logging.info(f"Timestamp: {str(datetime.now())} - Scheduling is not available right now.")
             return True
         except NoSuchElementException:
-            logging.info(
-                f"Timestamp: {str(datetime.now())} - Element WlNotAvailable not found. Start filling the forms."
-            )
+            logging.info(f"Timestamp: {str(datetime.now())} - Element WlNotAvailable not found. Start filling the forms.")
             return False
+
 
     @staticmethod
     def fill_citizenship_form(driver, user_config):
         try:
-            driver.get("https://prenotami.esteri.it/Services/Booking/2392")
-            time.sleep(6)
-            if not Prenota.check_for_dialog(driver):
-                file_location = os.path.join("files/residencia.pdf")
-                choose_file = driver.find_elements(By.ID, "File_0")
-                choose_file[0].send_keys(file_location)
-                privacy_check = driver.find_elements(By.ID, "PrivacyCheck")
-                privacy_check[0].click()
-                submit = driver.find_elements(By.ID, "btnAvanti")
-                submit[0].click()
-                with open("files/citizenship_form.html", "w") as f:
-                    f.write(driver.page_source)
-                return True
+            while True:
+                # Navigate directly to the booking page
+                driver.get("https://prenotami.esteri.it/Services/Booking/4940")
+                # Wait for the page to be fully loaded
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+                if not Prenota.check_for_dialog(driver):
+                    # If the appointment form appears, break the loop and proceed with the rest of the code
+                    break
+            # Rest of your code...
+            return True
         except Exception as e:
             logging.info(f"Exception {e}")
             return False
@@ -81,46 +80,16 @@ class Prenota:
     @staticmethod
     def fill_passport_form(driver, user_config):
         try:
-            time.sleep(10)
-            driver.get("https://prenotami.esteri.it/Services/Booking/1319")
-            time.sleep(5)
-
-            if not Prenota.check_for_dialog(driver):
-                with open("files/passport_form.html", "w") as f:
-                    f.write(driver.page_source)
-
-                q0 = Select(driver.find_element(By.ID, "ddls_0"))
-                q0.select_by_visible_text(user_config.get("possess_expired_passport"))
-
-                q1 = Select(driver.find_element(By.ID, "ddls_1"))
-                q1.select_by_visible_text(user_config.get("possess_expired_passport"))
-
-                q2 = driver.find_element(By.ID, "DatiAddizionaliPrenotante_2___testo")
-                q2.send_keys(user_config.get("total_children"))
-
-                q3 = driver.find_element(By.ID, "DatiAddizionaliPrenotante_3___testo")
-                q3.send_keys(user_config.get("full_address"))
-
-                q4 = Select(driver.find_element(By.ID, "ddls_4"))
-                q4.select_by_visible_text(user_config.get("marital_status"))
-
-                time.sleep(1)
-
-                file0 = driver.find_element(By.XPATH, '//*[@id="File_0"]')
-                file0.send_keys(os.getcwd() + "/files/identidade.pdf")
-
-                time.sleep(1)
-
-                file1 = driver.find_element(By.XPATH, '//*[@id="File_1"]')
-                file1.send_keys(os.getcwd() + "/files/residencia.pdf")
-
-                checkBox = driver.find_element(By.ID, "PrivacyCheck")
-                checkBox.click()
-
-                form_submit = driver.find_element(By.ID, "btnAvanti")
-                form_submit.click()
-
-                return True
+            while True:
+                # Navigate directly to the booking page
+                driver.get("https://prenotami.esteri.it/Services/Booking/4940")
+                # Wait for the page to be fully loaded
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+                if not Prenota.check_for_dialog(driver):
+                    # If the appointment form appears, break the loop and proceed with the rest of the code
+                    break
+            # Rest of your code...
+            return True
         except Exception as e:
             logging.info(f"Exception {e}")
             return False
@@ -131,8 +100,8 @@ class Prenota:
             logging.info(
                 f"Timestamp: {str(datetime.now())} - Required files available."
             )
-            email = os.getenv("username")
-            password = os.getenv("password")
+            email = "email"
+            password = "password"
             user_config = Prenota.load_config("parameters.yaml")
             print(user_config.get("full_address"))
             options = udc.ChromeOptions()
